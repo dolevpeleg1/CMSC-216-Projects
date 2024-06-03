@@ -1,0 +1,623 @@
+#+TITLE: Problem 5 MAKEUP CREDIT Cyclic Dependency Checks
+#+TESTY: PREFIX="prob5"
+#+TESTY: USE_VALGRIND=1
+# disable memory leak detection in forked children
+#+TESTY: VALGRIND_PROG+=" --child-silent-after-fork=yes"
+
+* bake_check_cycles_noprint1
+#+TESTY: program="./test_bake_funcs5 bake_check_cycles_noprint1"
+#+BEGIN_SRC sh
+IF_TEST("bake_check_cycles_noprint1") { 
+    // Checks several Bakefiles for cycles without printing to
+    // determine if bake_check_cycles() correctly identifies cycles vs
+    // not.  Printing is not enabled as getting the message printing
+    // correct is trickier.
+    bake_t *bake; int ret;
+
+    // bake_check_cycles01
+    system("rm -rf test-results/bake_check_cycles01");
+    system("cp -r data5/bake_check_cycles01 test-results/");
+    chdir("test-results/bake_check_cycles01");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles()---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",0);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles02
+    system("rm -rf test-results/bake_check_cycles02");
+    system("cp -r data5/bake_check_cycles02 test-results/");
+    chdir("test-results/bake_check_cycles02");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles()---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",0);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles03
+    system("rm -rf test-results/bake_check_cycles03");
+    system("cp -r data5/bake_check_cycles03 test-results/");
+    chdir("test-results/bake_check_cycles03");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("--- CALL TO bake_check_cycles() fileA.txt ---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",0);
+    printf("ret: %d\n",ret);
+    printf("--- CALL TO bake_check_cycles() fileX.txt ---\n");
+    ret = bake_check_cycles(bake,"fileX.txt",0);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles04
+    system("rm -rf test-results/bake_check_cycles04");
+    system("cp -r data5/bake_check_cycles04 test-results/");
+    chdir("test-results/bake_check_cycles04");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles() fileUL.txt---\n");
+    ret = bake_check_cycles(bake,"fileUL.txt",0);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileUR.txt---\n");
+    ret = bake_check_cycles(bake,"fileUR.txt",0);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles_none
+    system("rm -rf test-results/bake_check_cycles_none");
+    system("cp -r data5/bake_check_cycles_none test-results/");
+    chdir("test-results/bake_check_cycles_none");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles()---\n");
+    ret = bake_check_cycles(bake,"all",0);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+}
+---OUTPUT---
+
+--- CONTENTS OF BAKEFILE ---
+# cycle of A->B->C->A
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileA.txt
+	@ echo completed fileC.txt
+---CALL TO bake_check_cycles()---
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# cycle of A->B->C->D->B
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+fileD.txt : fileB.txt
+	@ echo completed fileD.txt
+---CALL TO bake_check_cycles()---
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# cycle NOT present on default target but starting at any of X->Y->Z->W
+# get a cycle
+
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+# file D is implicit
+
+# cycle in below
+fileX.txt : fileY.txt
+	@ echo completed fileX.txt
+
+fileY.txt : fileZ.txt
+	@ echo completed fileY.txt
+
+fileZ.txt : fileW.txt
+	@ echo completed fileZ.txt
+
+fileW.txt : fileX.txt
+	@ echo completed fileW.txt
+--- CALL TO bake_check_cycles() fileA.txt ---
+ret: 0
+--- CALL TO bake_check_cycles() fileX.txt ---
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# X pattern with upper left and upper right files dependent on an
+# central X file whic his depdendent on 2 children branches of lower
+# left and lower right. The Lower Left branch cycles to the Upper
+# Right.
+
+fileUL.txt : fileX.txt
+	@ echo completed fileUL.txt
+
+fileUR.txt : fileX.txt
+	@ echo completed fileUR.txt
+
+fileX.txt : fileLL1.txt fileLR1.txt
+	@ echo completed fileX.txt
+
+fileLL1.txt : fileLL2.txt
+	@ echo completed fileLL1.txt
+
+fileLL2.txt : fileUR.txt
+	@ echo completed fileLL2.txt
+
+fileLR1.txt : fileLR2.txt
+	@ echo completed fileLR1.txt
+
+# fileLR2.txt is implicit
+---CALL TO bake_check_cycles() fileUL.txt---
+ret: 1
+---CALL TO bake_check_cycles() fileUR.txt---
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# no cycles exist in this Bakefile
+all : prog1 prog2
+
+
+prog1 : x.o y.o
+	gcc -o prog1 x.o y.o
+
+prog2 : x.o z.o
+	gcc -o prog2 x.o z.o
+
+x.o : x.c
+	gcc -c x.c
+
+y.o : y.c
+	gcc -c y.c
+
+z.o : z.c
+	gcc -c z.c
+
+clean :
+	rm -f x.o y.o z.o prog1 prog2
+---CALL TO bake_check_cycles()---
+ret: 0
+#+END_SRC
+
+* bake_check_cycles_print1
+#+TESTY: program="./test_bake_funcs5 bake_check_cycles_print1"
+#+BEGIN_SRC sh
+IF_TEST("bake_check_cycles_print1") { 
+    // Checks a couple Bakefiles for cycles WITH printing to
+    // determine if bake_check_cycles() correctly identifies cycles vs
+    // not.  These are simple, short cycles.
+    bake_t *bake; int ret;
+
+    // bake_check_cycles01
+    system("rm -rf test-results/bake_check_cycles01");
+    system("cp -r data5/bake_check_cycles01 test-results/");
+    chdir("test-results/bake_check_cycles01");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles() fileA.txt---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileB.txt---\n");
+    ret = bake_check_cycles(bake,"fileB.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileC.txt---\n");
+    ret = bake_check_cycles(bake,"fileC.txt",1);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles02
+    system("rm -rf test-results/bake_check_cycles02");
+    system("cp -r data5/bake_check_cycles02 test-results/");
+    chdir("test-results/bake_check_cycles02");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles() fileC.txt---\n");
+    ret = bake_check_cycles(bake,"fileC.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileD.txt---\n");
+    ret = bake_check_cycles(bake,"fileD.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileA.txt---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",1);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+}
+---OUTPUT---
+
+--- CONTENTS OF BAKEFILE ---
+# cycle of A->B->C->A
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileA.txt
+	@ echo completed fileC.txt
+---CALL TO bake_check_cycles() fileA.txt---
+ERROR Cyclic Dependency detected:
+fileA.txt -> fileB.txt -> fileC.txt -> fileA.txt
+ret: 1
+---CALL TO bake_check_cycles() fileB.txt---
+ERROR Cyclic Dependency detected:
+fileB.txt -> fileC.txt -> fileA.txt -> fileB.txt
+ret: 1
+---CALL TO bake_check_cycles() fileC.txt---
+ERROR Cyclic Dependency detected:
+fileC.txt -> fileA.txt -> fileB.txt -> fileC.txt
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# cycle of A->B->C->D->B
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+fileD.txt : fileB.txt
+	@ echo completed fileD.txt
+---CALL TO bake_check_cycles() fileC.txt---
+ERROR Cyclic Dependency detected:
+fileC.txt -> fileD.txt -> fileB.txt -> fileC.txt
+ret: 1
+---CALL TO bake_check_cycles() fileD.txt---
+ERROR Cyclic Dependency detected:
+fileD.txt -> fileB.txt -> fileC.txt -> fileD.txt
+ret: 1
+---CALL TO bake_check_cycles() fileA.txt---
+ERROR Cyclic Dependency detected:
+fileA.txt -> fileB.txt -> fileC.txt -> fileD.txt -> fileB.txt
+ret: 1
+#+END_SRC
+
+* bake_check_cycles_print2
+#+TESTY: program="./test_bake_funcs5 bake_check_cycles_print2"
+#+BEGIN_SRC sh
+IF_TEST("bake_check_cycles_print2") { 
+    // Checks more complex Bakefiles for cycles WITH printing to
+    // determine if bake_check_cycles() correctly identifies cycles vs
+    // not. Cycles are longer and somewhat more involved in this test.
+    bake_t *bake; int ret;
+
+    // bake_check_cycles03
+    system("rm -rf test-results/bake_check_cycles03");
+    system("cp -r data5/bake_check_cycles03 test-results/");
+    chdir("test-results/bake_check_cycles03");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles() fileA.txt---\n");
+    ret = bake_check_cycles(bake,"fileA.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileX.txt---\n");
+    ret = bake_check_cycles(bake,"fileX.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileZ.txt---\n");
+    ret = bake_check_cycles(bake,"fileZ.txt",1);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+
+    // bake_check_cycles04
+    system("rm -rf test-results/bake_check_cycles04");
+    system("cp -r data5/bake_check_cycles04 test-results/");
+    chdir("test-results/bake_check_cycles04");
+    printf("\n--- CONTENTS OF BAKEFILE ---\n");
+    system("cat Bakefile");
+    bake = bake_create_from_file("Bakefile");
+    bake_add_implicit_rules(bake);
+    printf("---CALL TO bake_check_cycles() fileUL.txt---\n");
+    ret = bake_check_cycles(bake,"fileUL.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileUR.txt---\n");
+    ret = bake_check_cycles(bake,"fileUR.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileX.txt---\n");
+    ret = bake_check_cycles(bake,"fileX.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileLL1.txt---\n");
+    ret = bake_check_cycles(bake,"fileLL1.txt",1);
+    printf("ret: %d\n",ret);
+    printf("---CALL TO bake_check_cycles() fileLR1.txt---\n");
+    ret = bake_check_cycles(bake,"fileLL1.txt",1);
+    printf("ret: %d\n",ret);
+    bake_free(bake);
+    chdir("../..");
+}
+---OUTPUT---
+
+--- CONTENTS OF BAKEFILE ---
+# cycle NOT present on default target but starting at any of X->Y->Z->W
+# get a cycle
+
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+# file D is implicit
+
+# cycle in below
+fileX.txt : fileY.txt
+	@ echo completed fileX.txt
+
+fileY.txt : fileZ.txt
+	@ echo completed fileY.txt
+
+fileZ.txt : fileW.txt
+	@ echo completed fileZ.txt
+
+fileW.txt : fileX.txt
+	@ echo completed fileW.txt
+---CALL TO bake_check_cycles() fileA.txt---
+ret: 0
+---CALL TO bake_check_cycles() fileX.txt---
+ERROR Cyclic Dependency detected:
+fileX.txt -> fileY.txt -> fileZ.txt -> fileW.txt -> fileX.txt
+ret: 1
+---CALL TO bake_check_cycles() fileZ.txt---
+ERROR Cyclic Dependency detected:
+fileZ.txt -> fileW.txt -> fileX.txt -> fileY.txt -> fileZ.txt
+ret: 1
+
+--- CONTENTS OF BAKEFILE ---
+# X pattern with upper left and upper right files dependent on an
+# central X file whic his depdendent on 2 children branches of lower
+# left and lower right. The Lower Left branch cycles to the Upper
+# Right.
+
+fileUL.txt : fileX.txt
+	@ echo completed fileUL.txt
+
+fileUR.txt : fileX.txt
+	@ echo completed fileUR.txt
+
+fileX.txt : fileLL1.txt fileLR1.txt
+	@ echo completed fileX.txt
+
+fileLL1.txt : fileLL2.txt
+	@ echo completed fileLL1.txt
+
+fileLL2.txt : fileUR.txt
+	@ echo completed fileLL2.txt
+
+fileLR1.txt : fileLR2.txt
+	@ echo completed fileLR1.txt
+
+# fileLR2.txt is implicit
+---CALL TO bake_check_cycles() fileUL.txt---
+ERROR Cyclic Dependency detected:
+fileUL.txt -> fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt
+ret: 1
+---CALL TO bake_check_cycles() fileUR.txt---
+ERROR Cyclic Dependency detected:
+fileUR.txt -> fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt
+ret: 1
+---CALL TO bake_check_cycles() fileX.txt---
+ERROR Cyclic Dependency detected:
+fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt
+ret: 1
+---CALL TO bake_check_cycles() fileLL1.txt---
+ERROR Cyclic Dependency detected:
+fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt -> fileLL1.txt
+ret: 1
+---CALL TO bake_check_cycles() fileLR1.txt---
+ERROR Cyclic Dependency detected:
+fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt -> fileLL1.txt
+ret: 1
+#+END_SRC
+
+* bake_check_cycles_main1
+Checks that several runs of main() bake correctly identify cycles and
+report them.
+
+#+TESTY: use_valgrind=0
+#+BEGIN_SRC sh
+>> rm -rf test-results/bake_check_cycles01
+>> cp -r data5/bake_check_cycles01 test-results/
+>> cd test-results/bake_check_cycles01
+>> cat Bakefile
+# cycle of A->B->C->A
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileA.txt
+	@ echo completed fileC.txt
+>> ../../bake
+ERROR Cyclic Dependency detected:
+fileA.txt -> fileB.txt -> fileC.txt -> fileA.txt
+bake failed
+>> ../../bake fileC.txt
+ERROR Cyclic Dependency detected:
+fileC.txt -> fileA.txt -> fileB.txt -> fileC.txt
+bake failed
+>> cd ../..
+>> rm -rf test-results/bake_check_cycles02
+>> cp -r data5/bake_check_cycles02 test-results/
+>> cd test-results/bake_check_cycles02
+>> cat Bakefile 
+# cycle of A->B->C->D->B
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+fileD.txt : fileB.txt
+	@ echo completed fileD.txt
+>> ../../bake
+ERROR Cyclic Dependency detected:
+fileA.txt -> fileB.txt -> fileC.txt -> fileD.txt -> fileB.txt
+bake failed
+>> ../../bake fileD.txt
+ERROR Cyclic Dependency detected:
+fileD.txt -> fileB.txt -> fileC.txt -> fileD.txt
+bake failed
+>> ../../bake -f Bakefile fileC.txt
+ERROR Cyclic Dependency detected:
+fileC.txt -> fileD.txt -> fileB.txt -> fileC.txt
+bake failed
+>> cd ../..
+>> rm -rf test-results/bake_check_cycles03
+>> cp -r data5/bake_check_cycles03 test-results/
+>> cd test-results/bake_check_cycles03
+>> cat Bakefile
+# cycle NOT present on default target but starting at any of X->Y->Z->W
+# get a cycle
+
+fileA.txt : fileB.txt
+	@ echo completed fileA.txt
+
+fileB.txt : fileC.txt
+	@ echo completed fileB.txt
+
+fileC.txt : fileD.txt
+	@ echo completed fileC.txt
+
+# file D is implicit
+
+# cycle in below
+fileX.txt : fileY.txt
+	@ echo completed fileX.txt
+
+fileY.txt : fileZ.txt
+	@ echo completed fileY.txt
+
+fileZ.txt : fileW.txt
+	@ echo completed fileZ.txt
+
+fileW.txt : fileX.txt
+	@ echo completed fileW.txt
+>> ../../bake fileY.txt
+ERROR Cyclic Dependency detected:
+fileY.txt -> fileZ.txt -> fileW.txt -> fileX.txt -> fileY.txt
+bake failed
+>> ../../bake not-there.txt
+No rule to create target 'not-there.txt'
+bake failed
+>> cd ../..
+>> rm -rf test-results/bake_check_cycles04
+>> cp -r data5/bake_check_cycles04 test-results/
+>> cd test-results/bake_check_cycles04
+>> cat Bakefile
+# X pattern with upper left and upper right files dependent on an
+# central X file whic his depdendent on 2 children branches of lower
+# left and lower right. The Lower Left branch cycles to the Upper
+# Right.
+
+fileUL.txt : fileX.txt
+	@ echo completed fileUL.txt
+
+fileUR.txt : fileX.txt
+	@ echo completed fileUR.txt
+
+fileX.txt : fileLL1.txt fileLR1.txt
+	@ echo completed fileX.txt
+
+fileLL1.txt : fileLL2.txt
+	@ echo completed fileLL1.txt
+
+fileLL2.txt : fileUR.txt
+	@ echo completed fileLL2.txt
+
+fileLR1.txt : fileLR2.txt
+	@ echo completed fileLR1.txt
+
+# fileLR2.txt is implicit
+>> ../../bake
+ERROR Cyclic Dependency detected:
+fileUL.txt -> fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt
+bake failed
+>> ../../bake fileX.txt
+ERROR Cyclic Dependency detected:
+fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt
+bake failed
+>> ../../bake fileUR.txt
+ERROR Cyclic Dependency detected:
+fileUR.txt -> fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt
+bake failed
+>> ../../bake fileLR.txt
+No rule to create target 'fileLR.txt'
+bake failed
+>> ../../bake fileLR1.txt
+bake: updating 'fileLR1.txt' via 1 command(s)
+completed fileLR1.txt
+bake complete, 1 update(s) performed
+#+END_SRC
+
+* bake_check_cycles_main_mem1
+Runs bake under valgrind to check that when a cyclic dependency check
+fails, memory is de-allocated and the program terminates with a
+exit code 1 (EXIT_FAILURE).
+
+#+TESTY: set_test_directory $test_title
+#+TESTY: cp -r data5/bake_check_cycles04/* $testdir
+#+TESTY: use_valgrind=1
+
+#+TESTY: program='../../bake fileUL.txt'
+#+BEGIN_SRC sh
+ERROR Cyclic Dependency detected:
+fileUL.txt -> fileX.txt -> fileLL1.txt -> fileLL2.txt -> fileUR.txt -> fileX.txt
+bake failed
+Non-zero return code 1
+#+END_SRC
+
+
+#+TESTY: program='../../bake no-such-file.txt'
+#+BEGIN_SRC sh
+No rule to create target 'no-such-file.txt'
+bake failed
+Non-zero return code 1
+#+END_SRC

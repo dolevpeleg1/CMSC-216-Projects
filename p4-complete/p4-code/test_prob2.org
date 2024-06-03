@@ -1,0 +1,247 @@
+#+TITLE: Problem 2 bake_execute_command() Tests
+#+TESTY: PREFIX="prob2"
+#+TESTY: USE_VALGRIND=1
+# disable memory leak detection in forked children
+#+TESTY: VALGRIND_PROG+=" --child-silent-after-fork=yes"
+
+# CHANGELOG: 
+# 
+# Tue Apr 16 05:06:30 PM EDT 2024 : Update to test 7 to filter out
+# single quote characters form 'ls' listing of non-existent files;
+# fixes tests on grace.
+
+* bake_execute_cmd1 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd1"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd1") { 
+    // Checks that simple command excutions works correctly
+    cmd_t cmd = {
+      .tokens = {"echo","Alas poor Yorick, I knew him, Horatio."},
+      .input_redirect  = NULL,
+      .output_redirect = NULL,
+      .line_number = 13,
+      .cmd_flags = 0,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+echo Alas poor Yorick, I knew him, Horatio. 
+Alas poor Yorick, I knew him, Horatio.
+ret: 0
+#+END_SRC
+
+* bake_execute_cmd2 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd2"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd2") { 
+    // Checks that simple command excutions works correctly
+    cmd_t cmd = {
+      .tokens = {"seq","1","10","60"},
+      .input_redirect  = NULL,
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = 0,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+seq 1 10 60 
+1
+11
+21
+31
+41
+51
+ret: 0
+#+END_SRC
+
+* bake_execute_cmd3 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd3"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd3") { 
+    // Checks that simple command excutions works correctly
+    cmd_t cmd = {
+      .tokens = {"wc","-l","data/randnums.txt",
+                 "data/randnums50.txt","data/gettysburg.txt"},
+      .input_redirect  = NULL,
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = 0,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+wc -l data/randnums.txt data/randnums50.txt data/gettysburg.txt 
+   2 data/randnums.txt
+  50 data/randnums50.txt
+  32 data/gettysburg.txt
+  84 total
+ret: 0
+#+END_SRC
+
+* bake_execute_cmd_in1 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_in1"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_in1") { 
+    // Checks command w/ input redirection executes correctly
+    cmd_t cmd = {
+      .tokens = {"wc","-w","-c"},
+      .input_redirect  = "data/gettysburg.txt",
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = CMD_INPREDI_BIT,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+wc -w -c < data/gettysburg.txt 
+ 283 1511
+ret: 0
+#+END_SRC
+
+* bake_execute_cmd_out1 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_out1"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_out1") { 
+    // Checks command w/ output redirection executes correctly
+    cmd_t cmd = {
+      .tokens = {"wc","data/gettysburg.txt"},
+      .input_redirect  = NULL,
+      .output_redirect = "test-results/cmd_out1.txt",
+      .line_number = 0,
+      .cmd_flags = CMD_OUTREDI_BIT,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+    printf("FILE CONTENTS\n");
+    system("cat test-results/cmd_out1.txt");
+}
+---OUTPUT---
+wc data/gettysburg.txt > test-results/cmd_out1.txt 
+ret: 0
+FILE CONTENTS
+  32  283 1511 data/gettysburg.txt
+#+END_SRC
+
+* bake_execute_cmd_inout1 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_inout1"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_inout1") { 
+    // Checks command w/ both input and output redirection executes
+    // correctly
+    cmd_t cmd = {
+      .tokens = {"sed","s/f/p/g; s/F/P/g"},
+      .input_redirect  = "data/gettysburg1.txt",
+      .output_redirect = "test-results/cmd_inout1.txt",
+      .line_number = 0,
+      .cmd_flags = CMD_INPREDI_BIT | CMD_OUTREDI_BIT,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+    printf("FILE CONTENTS\n");
+    system("cat test-results/cmd_inout1.txt");
+}
+---OUTPUT---
+sed s/f/p/g; s/F/P/g < data/gettysburg1.txt > test-results/cmd_inout1.txt 
+ret: 0
+FILE CONTENTS
+Pour score and seven years ago our pathers brought porth on
+this continent, a new nation, conceived in Liberty, and
+dedicated to the proposition that all men are created
+equal.
+#+END_SRC
+
+* bake_execute_cmd_fail1 
+#+TESTY: post_filter="tr -d \'"
+# Some invocations of 'ls' will use single quotes in the names of
+# files that are not found while others do not; appears to vary on
+# version.  Just filter this out to ensure some uniformity for the
+# exected test output.
+                      
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_fail1"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_fail1") { 
+    // Check for non-zero exit code from child is passed up
+    cmd_t cmd = {
+      .tokens = {"ls","data/no-such-file.txt"},
+      .input_redirect  = NULL,
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = 0,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+ls data/no-such-file.txt 
+ls: cannot access data/no-such-file.txt: No such file or directory
+ret: 2
+#+END_SRC
+
+* bake_execute_cmd_fail2 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_fail2"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_fail2") { 
+    // Checks that failing to exec() will return the correct exit code
+    cmd_t cmd = {
+      .tokens = {"wubba_lubba","dub","dub"}, // no such command
+      .input_redirect  = NULL,               // so exec will fail
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = 0,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+wubba_lubba dub dub 
+ERROR: command failed to exec: No such file or directory
+ret: 121
+#+END_SRC
+
+* bake_execute_cmd_fail3 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_fail3"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_fail3") { 
+    // Checks that failing to exec() will return the correct exit code
+    cmd_t cmd = {
+      .tokens = {"wc"},
+      .input_redirect  = "data/no-such-file.txt", // open() will fail
+      .output_redirect = NULL,
+      .line_number = 0,
+      .cmd_flags = CMD_INPREDI_BIT,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+wc < data/no-such-file.txt 
+ERROR: can't open file for input: No such file or directory
+ret: 122
+#+END_SRC
+
+* bake_execute_cmd_fail4 
+#+TESTY: program="./test_bake_funcs12 bake_execute_cmd_fail4"
+#+BEGIN_SRC sh
+IF_TEST("bake_execute_cmd_fail4") { 
+    // Checks that failing to exec() will return the correct exit code
+    cmd_t cmd = {
+      .tokens = {"echo","Failed to write"},
+      .input_redirect  = NULL,
+      .output_redirect = "test-results",         // can't write to a directory
+      .line_number = 0,
+      .cmd_flags = CMD_OUTREDI_BIT,
+    };
+    int ret = bake_execute_cmd(&cmd);
+    printf("ret: %d\n",ret);
+}
+---OUTPUT---
+echo Failed to write > test-results 
+ERROR: can't open file for output: Is a directory
+ret: 123
+#+END_SRC
+
